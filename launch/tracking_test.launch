@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="tracking_tester" type="tracking_tester_node" name="tracking_tester_node" output="screen">
+    </node>
+</launch>
