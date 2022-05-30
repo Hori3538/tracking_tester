@@ -12,6 +12,7 @@
 #include <camera_apps_msgs/ObjectsInfo.h>
 
 #include "hungarian.h"
+#include <fstream>
 
 class TrackingTester
 {
@@ -35,8 +36,13 @@ class TrackingTester
         double time_gap_threshold_;
         int person_num_;
         double mapping_error_th_;
+        std::string output_file_name_;
+        std::string output_file_path_;
 
         bool synchro_flag_;
+        bool objects_get_flag_;
+        ros::Time initial_time_;
+
         int FP_sum_ = 0;
         int FN_sum_ = 0;
         int switch_sum_ = 0;
@@ -46,6 +52,8 @@ class TrackingTester
         std::vector<std::vector<int>> before_map_;
         bool first_map_flag_ = false;
         double max_error_ = 0;
+
+        std::ofstream fout_;
 
         std::vector<tf2_msgs::TFMessage> tf_msgs_;
 

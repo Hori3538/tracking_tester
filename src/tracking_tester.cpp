@@ -6,6 +6,8 @@ TrackingTester::TrackingTester(ros::NodeHandle &nh, ros::NodeHandle &pnh)
     pnh.param("time_gap_threshold", time_gap_threshold_, 0.02);
     pnh.param("person_num", person_num_, 3);
     pnh.param("mapping_error_th", mapping_error_th_, 0.5);
+    pnh.param("output_file_name", output_file_name_, std::string("tester_log2.csv"));
+    pnh.param("output_file_path", output_file_path_, std::string("/home/amsl/"));
 
     tf_sub_ = nh.subscribe("/tf", 10, &TrackingTester::tf_callback, this);
     objects_sub_ = nh.subscribe("/tracking_result", 10, &TrackingTester::objects_callback, this);
@@ -13,10 +15,20 @@ TrackingTester::TrackingTester(ros::NodeHandle &nh, ros::NodeHandle &pnh)
     for(int i=0; i<person_num_; i++){
         before_map_.push_back({-1, -1});
     }
+    std::cout << output_file_path_ + output_file_name_ << std::endl;
+    fout_.open(output_file_path_ + output_file_name_);
+    // fout_.open("hoge.csv");
+    if(!fout_){
+        std::cout << "file open fail" << std::endl;
+        // exit(1);
+    }
+    // fout_ << "test";
 }
 
 TrackingTester::~TrackingTester()
 {
+    fout_.close();
+    std::cout << "file close\n";
 }
 void TrackingTester::tf_callback(const tf2_msgs::TFMessageConstPtr &tf_msg)
 {
@@ -36,14 +48,14 @@ void TrackingTester::objects_callback(const camera_apps_msgs::ObjectsInfoConstPt
     //     return;
     //
     // }
+    if(!objects_get_flag_) initial_time_ = objects_msg->header.stamp;
+    objects_get_flag_ = true;
+    // std::cout << "elapsed time: " << (objects_msg->header.stamp - initial_time_).sec + (objects_msg->header.stamp - initial_time_).nsec / std::pow(10, 9) << std::endl;
 
     tf2_msgs::TFMessage synchronized_tf;
     bool synchro_flag = search_tf(objects_msg->header.stamp, synchronized_tf);
     if(!synchro_flag) return;
     if(synchronized_tf.transforms.size() != person_num_ + 1){
-        // std::cout << "mocap num" << synchronized_tf.transforms.size() << std::endl;
-        // std::cout << "mocap data num is wrong" << std::endl;
-
         return;
     }
     else{
@@ -91,6 +103,25 @@ void TrackingTester::objects_callback(const camera_apps_msgs::ObjectsInfoConstPt
         std::cout << " MOTP: " << MOTP;
         std::cout << " max error: " << max_error_;
         std::cout << std::endl;
+
+        // std::cout << "nan: " << NAN << std::endl;
+        for(int i=1; i<synchronized_tf.transforms.size(); i++){
+            fout_ << synchronized_tf.transforms[i].child_frame_id << ",";
+
+            ros::Duration elapsed_time = synchronized_tf.transforms[i].header.stamp - initial_time_;
+            fout_ << elapsed_time.sec + elapsed_time.nsec / std::pow(10, 9) << ",";
+
+            fout_ << gt_poses[i-1].first << ",";
+            fout_ << gt_poses[i-1].second << ",";
+
+            if(map[i-1][0] != -1){
+                fout_ << objects_msg->objects_info[map[i-1][1]].centroid.x << ",";
+                fout_ << objects_msg->objects_info[map[i-1][1]].centroid.y << "\n";
+            }
+            else{
+                fout_ << NAN << "," << NAN << "\n";
+            }
+        }
     }
 }
 
@@ -103,7 +134,6 @@ bool TrackingTester::search_tf(ros::Time time, tf2_msgs::TFMessage& synchronized
             return true;
         }
     }
-    // std::cout << "cannot search synchronized tf" << std::endl;
     ros::Duration gap_begin = tf_msgs_[0].transforms[0].header.stamp - time;
     ros::Duration gap_back = tf_msgs_.back().transforms[0].header.stamp - time;
 
